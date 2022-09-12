@@ -5,6 +5,11 @@ const numbers = "123";
 const gridSize = 3;
 const grid = [];
 const instruction = "Enter a location to strike ie \'A2\'";
+const hitMessage = "Hit. You have sunk a battleship. 1 ship remaining.";
+const missMessage = "You have missed!";
+const repeatMessage = "You have already picked this location. Miss!";
+const debugMessages = false;
+let shipsRemaining = 0;
 //#endregion
 //#region Classes
 class Input
@@ -32,7 +37,7 @@ class Cell
 }
 //#endregion
 //#region Functions
-const getRandomIndex = () => Math.round(Math.random() * gridSize * gridSize);
+const getRandomIndex = () => Math.floor(Math.random() * gridSize * gridSize);
 
 function placeShips()
 {
@@ -44,7 +49,8 @@ function placeShips()
             randIndex = getRandomIndex();
         } while (grid[randIndex].hasShip);
         grid[randIndex].hasShip = true;
-        console.log("Placed a ship at " + randIndex);
+        shipsRemaining++;
+        debugLog("Placed a ship at " + randIndex);
     }
 }
 
@@ -60,24 +66,55 @@ function buildGrid(squareSize)
 
 function attack(input)
 {
-    let xCoordinate = letters.number - 1;
+    let xCoordinate = input.number - 1;
     let yCoordinate = letters.indexOf(input.letter);
-    let index = x + yCoordinate * gridSize;
-    
+    let index = xCoordinate + yCoordinate * gridSize;
+
+    debugLog(xCoordinate + ", " + yCoordinate);
+    debugLog("Attacked index " + index);
+    if (grid[index].wasHit)
+    {
+        console.log(repeatMessage);
+        return;
+    }
+    grid[index].wasHit = true;
+    if (grid[index].hasShip)
+    {
+        grid[index].hasShip = false;
+        shipsRemaining--;
+        if (shipsRemaining > 0) { console.log(hitMessage); }
+    }
+    else
+    {
+        console.log(missMessage);
+    }
+}
+
+function debugLog(message)
+{
+    if (debugMessages) { console.log(message); }
 }
 //#endregion
 //#region Execution
-let r = getRandomIndex();
 readline.keyIn("Press any key to start the game.");
-buildGrid(3);
-placeShips();
-console.log(instruction);
-readline.promptLoop((inputStr) =>
+let quit = false;
+do
 {
-    if (inputStr.toLowerCase() === "quit") { return true; }
-    let input = new Input(inputStr);
-    if (input.isValid) { attack(input); }
-    return false;
-});
+    buildGrid(3);
+    console.log(grid);
+    placeShips();
+    console.log(instruction);
+    readline.promptLoop((inputStr) =>
+    {
+        if (inputStr.toLowerCase() === "quit") 
+        { 
+            quit = true;
+            return true; 
+        }
+        let input = new Input(inputStr);
+        if (input.isValid) { attack(input); }
+        return shipsRemaining === 0;
+    });
+} while (!quit && readline.keyInYN("You have destroyed all battleships. Would you like to play again?"));
 console.log("Successfully quit");
 //#endregion
