@@ -31,34 +31,102 @@ class Cell
 {
     constructor()
     {
-        this.hasShip = false;
+        this.shipHere = null;
         this.wasHit = false;
+    }
+}
+class Ship
+{
+    constructor(name, length, pointDown)
+    {
+        this.name = name;
+        this.length = length;
+        this.pointDown = pointDown;
+        this.health = length;
+    }
+}
+class Vector2
+{
+    constructor(x, y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+    add(vectorToAdd)
+    {
+        this.x += vectorToAdd.x;
+        this.y += vectorToAdd.y;
     }
 }
 //#endregion
 //#region Functions
 const getRandomIndex = () => Math.floor(Math.random() * gridSize * gridSize);
+const coordsToIndex = (x, y) => y * gridSize + x;
+const indexToCoords = (index) => [index % gridSize, Math.floor(index / gridSize)];
+const coordsToCellName = (x, y) => `${letters.charAt(y)}${x + 1}`;
+const randomInt = (minInclusive, maxExclusive) => Math.floor(Math.random() * (maxExclusive - minInclusive)) + minInclusive;
 
-function placeShips()
+function placeAllShips()
 {
-    for (let i = 0; i < 2; i++)
-    {
-        let randIndex = 0;
-        do
-        {
-            randIndex = getRandomIndex();
-        } while (grid[randIndex].hasShip);
-        grid[randIndex].hasShip = true;
-        shipsRemaining++;
-
-        let x = randIndex % gridSize;
-        let y = Math.floor(randIndex / gridSize);
-        let letter = letters.charAt(y);
-        let number = x + 1;
-        debugLog("Placed a ship at " + randIndex + "(" + letter + number + ")");
-    }
+    placeShip(new Ship("Destroyer", 2));
+    placeShip(new Ship("Submarine", 3));
+    placeShip(new Ship("Cruiser", 3));
+    placeShip(new Ship("Battleship", 4));
+    placeShip(new Ship("Carrier", 5));
 }
 
+function placeShip(ship)
+{
+    debugLog(`Preparing to place ${ship.name}`);
+    let safety = 0;
+    while (safety < 9999)
+    {
+        let randPos = new Vector2(randomInt(0, gridSize), randomInt(0, gridSize));
+        let pointDown = Math.random() > 0.5 ? true : false;
+        let cellRange = tryGetEmptyCellRange(randPos.x, randPos.y, ship.length, ship.pointDown);
+        if (cellRange != null)
+        {
+            debugLog(`Placing ${ship.name} going ${pointDown ? "down" : "right"} from ${coordsToCellName(randPos.x, randPos.y)}`);
+            for (cell of cellRange)
+            {
+                cell.shipHere = ship;
+            }
+            break;
+        }
+        debugLog("Placement failed.");
+        safety++;
+    }
+    if (safety === 9999) { console.log("Runaway loop!"); }
+}
+
+function tryGetEmptyCellRange(startX, startY, length, goDown)
+{
+    let curPos = new Vector2(startX, startY);
+    let incrementor = goDown ? new Vector2(0, 1) : new Vector2(1, 0);
+    let cellRange = [];
+    for (let i = 0; i < length; i++)
+    {
+        curPos.add(incrementor);
+        let index = coordsToIndex(curPos.x, curPos.y);
+        if (!isInBounds(curPos))
+        {
+            debugLog("The cell range went out of bounds.");
+            return null;
+        }
+        if (grid[index].shipHere != null) 
+        { 
+            debugLog(`The cell already has a ${grid[index].shipHere.name}.`);
+            return null; 
+        }
+    }
+    return cellRange;
+}
+
+function isInBounds(positionVector)
+{
+    return positionVector.x >= 0 && positionVector.x < gridSize &&
+    positionVector.y >= 0 && positionVector.y < gridSize;
+}
 
 function buildGrid(squareSize)
 {
@@ -106,7 +174,7 @@ let quit = false;
 do
 {
     buildGrid(gridSize);
-    placeShips();
+    placeAllShips();
     console.log(instruction);
     readline.promptLoop((inputStr) =>
     {
