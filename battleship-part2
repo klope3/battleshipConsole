@@ -1,14 +1,14 @@
 //#region Variables
 const readline = require("readline-sync");
-const letters = "abc";
-const numbers = "123";
-const gridSize = 3;
+const letters = "abcdefghij";
+const numbers = ["1","2","3","4","5","6","7","8","9","10",]; //expanded to array because 10 has two characters
+const gridSize = 10;
 const grid = [];
 const instruction = "Enter a location to strike ie \'A2\'";
 const hitMessage = "Hit. You have sunk a battleship. 1 ship remaining.";
 const missMessage = "You have missed!";
 const repeatMessage = "You have already picked this location. Miss!";
-const debugMessages = false;
+const debugMessages = true;
 let shipsRemaining = 0;
 //#endregion
 //#region Classes
@@ -50,7 +50,12 @@ function placeShips()
         } while (grid[randIndex].hasShip);
         grid[randIndex].hasShip = true;
         shipsRemaining++;
-        debugLog("Placed a ship at " + randIndex);
+
+        let x = randIndex % gridSize;
+        let y = Math.floor(randIndex / gridSize);
+        let letter = letters.charAt(y);
+        let number = x + 1;
+        debugLog("Placed a ship at " + randIndex + "(" + letter + number + ")");
     }
 }
 
@@ -100,7 +105,7 @@ readline.keyIn("Press any key to start the game.");
 let quit = false;
 do
 {
-    buildGrid(3);
+    buildGrid(gridSize);
     placeShips();
     console.log(instruction);
     readline.promptLoop((inputStr) =>
