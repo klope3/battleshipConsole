@@ -5,10 +5,9 @@ const numbers = ["1","2","3","4","5","6","7","8","9","10",]; //expanded to array
 const gridSize = 10;
 const grid = [];
 const instruction = "Enter a location to strike ie \'A2\'";
-const hitMessage = "Hit. You have sunk a battleship. 1 ship remaining.";
 const missMessage = "You have missed!";
 const repeatMessage = "You have already picked this location. Miss!";
-const debugMessages = true;
+const debugMessages = false;
 let shipsRemaining = 0;
 //#endregion
 //#region Classes
@@ -109,7 +108,6 @@ function tryGetEmptyCellRange(startX, startY, length, goDown)
     for (let i = 0; i < length; i++)
     {
         let index = coordsToIndex(curPos.x, curPos.y);
-        console.log("Index " + index);
         if (!isInBounds(curPos))
         {
             debugLog("The cell range went out of bounds.");
@@ -147,19 +145,23 @@ function attack(input)
     let yCoordinate = letters.indexOf(input.letter);
     let index = xCoordinate + yCoordinate * gridSize;
 
-    debugLog(xCoordinate + ", " + yCoordinate);
-    debugLog("Attacked index " + index);
     if (grid[index].wasHit)
     {
         console.log(repeatMessage);
         return;
     }
     grid[index].wasHit = true;
-    if (grid[index].hasShip)
+    let shipHere = grid[index].shipHere;
+    if (shipHere != null)
     {
-        grid[index].hasShip = false;
-        shipsRemaining--;
-        if (shipsRemaining > 0) { console.log(hitMessage); }
+        shipHere.health--;
+        let hitMessage = "Hit!";
+        if (shipHere.health === 0)
+        {
+            shipsRemaining--;
+            hitMessage += ` You have sunk a ${shipHere.name}.`;
+        }
+        console.log(hitMessage);
     }
     else
     {
@@ -185,7 +187,14 @@ function drawCellRow(yCoordinate)
     {
         let index = coordsToIndex(xCoordinate, yCoordinate);
         let cellGraphic = "  ";
-        if (grid[index].shipHere != null) { cellGraphic = grid[index].shipHere.name.slice(0, 2); }
+        if (debugMessages && grid[index].shipHere != null) 
+        { 
+            cellGraphic = grid[index].shipHere.name.slice(0, 2); 
+        }
+        if (grid[index].wasHit)
+        {
+            cellGraphic = grid[index].shipHere != null ? "XX" : "OO";
+        }
         str += ` ${cellGraphic} |`;
     }
     console.log(str);
@@ -223,7 +232,11 @@ do
             return true; 
         }
         let input = new Input(inputStr);
-        if (input.isValid) { attack(input); }
+        if (input.isValid) 
+        { 
+            attack(input); 
+            drawGrid();
+        }
         return shipsRemaining === 0;
     });
 } while (!quit && readline.keyInYN("You have destroyed all battleships. Would you like to play again?"));
