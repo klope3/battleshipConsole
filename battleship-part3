@@ -64,6 +64,7 @@ const coordsToIndex = (x, y) => y * gridSize + x;
 const indexToCoords = (index) => [index % gridSize, Math.floor(index / gridSize)];
 const coordsToCellName = (x, y) => `${letters.charAt(y)}${x + 1}`;
 const randomInt = (minInclusive, maxExclusive) => Math.floor(Math.random() * (maxExclusive - minInclusive)) + minInclusive;
+const drawHorzLine = () => console.log("   +" + "----+".repeat(gridSize));
 
 function placeAllShips()
 {
@@ -146,26 +147,66 @@ function attack(input)
 
     if (grid[index].wasHit)
     {
-        console.log(repeatMessage);
-        return;
+        return repeatMessage;
     }
     grid[index].wasHit = true;
     let shipHere = grid[index].shipHere;
     if (shipHere != null)
     {
         shipHere.health--;
-        let hitMessage = "Hit!";
+        let resultMessage = "Hit!";
         if (shipHere.health === 0)
         {
             shipsRemaining--;
-            hitMessage += ` You have sunk a ${shipHere.name}.`;
+            resultMessage += ` You have sunk a ${shipHere.name}.`;
         }
-        console.log(hitMessage);
+        return resultMessage;
     }
     else
     {
-        console.log(missMessage);
+        return missMessage;
     }
+}
+
+function drawGrid()
+{
+    drawTopNumbers();
+    drawHorzLine();
+    for (let i = 0; i < gridSize; i++)
+    {
+        drawCellRow(i);
+        drawHorzLine();
+    }
+}
+
+function drawCellRow(yCoordinate)
+{
+    let str = `${letters.charAt(yCoordinate)}  |`;
+    for (let xCoordinate = 0; xCoordinate < gridSize; xCoordinate++)
+    {
+        let index = coordsToIndex(xCoordinate, yCoordinate);
+        let cellGraphic = "  ";
+        if (debugMessages && grid[index].shipHere != null) 
+        { 
+            cellGraphic = grid[index].shipHere.name.slice(0, 2); 
+        }
+        if (grid[index].wasHit)
+        {
+            cellGraphic = grid[index].shipHere != null ? "XX" : "OO";
+        }
+        str += ` ${cellGraphic} |`;
+    }
+    console.log(str);
+}
+
+function drawTopNumbers()
+{
+    let str = " ".repeat(3);
+    for (let i = 0; i < 10; i++)
+    {
+        str += `  ${i + 1}  `;
+    }
+    console.log(str);
 }
 
 function debugLog(message)
@@ -180,6 +221,7 @@ do
 {
     buildGrid(gridSize);
     placeAllShips();
+    drawGrid();
     console.log(instruction);
     readline.promptLoop((inputStr) =>
     {
@@ -191,7 +233,9 @@ do
         let input = new Input(inputStr);
         if (input.isValid) 
         { 
-            attack(input); 
+            let resultMessage = attack(input); 
+            drawGrid();
+            console.log(resultMessage);
         }
         return shipsRemaining === 0;
     });
