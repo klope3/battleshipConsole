@@ -6,9 +6,9 @@ const gridSize = 10;
 const playerGrid = [];
 const enemyGrid = [];
 const instruction = "Enter a location to strike ie \'A2\'";
-const missMessage = "You have missed!";
 const repeatMessage = "You have already picked this location. Miss!";
-const debugMessages = true;
+const debugMessages = false;
+const enemyCheats = false; //make the enemy hit one of our ships every time, for debugging only
 let playerShipsRemaining = 0;
 let enemyShipsRemaining = 0;
 //#endregion
@@ -92,6 +92,7 @@ function placeShip(ship, targetGrid)
         let randPos = new Vector2(randomInt(0, gridSize), randomInt(0, gridSize));
         let pointDown = Math.random() > 0.5 ? true : false;
         let cellRange = tryGetEmptyCellRange(randPos.x, randPos.y, ship.length, pointDown, targetGrid);
+        let isPlayerShip = targetGrid === playerGrid;
         if (cellRange != null)
         {
             debugLog(`Placing ${ship.name} going ${pointDown ? "down" : "right"} from ${coordsToCellName(randPos.x, randPos.y)}`);
@@ -99,7 +100,8 @@ function placeShip(ship, targetGrid)
             {
                 cell.shipHere = ship;
             }
-            enemyShipsRemaining++;
+            if (isPlayerShip) { playerShipsRemaining++; }
+            else { enemyShipsRemaining++; }
             break;
         }
         debugLog("Placement failed.");
@@ -135,29 +137,94 @@ function playerAttackEnemy(input)
     {
         return repeatMessage;
     }
-    enemyGrid[index].wasHit = true;
-    let shipHere = enemyGrid[index].shipHere;
-    if (shipHere != null)
-    {
-        shipHere.health--;
-        let resultMessage = "Hit!";
-        if (shipHere.health === 0)
-        {
-            enemyShipsRemaining--;
-            resultMessage += ` You have sunk a ${shipHere.name}.`;
-        }
-        return resultMessage;
-    }
-    else
-    {
-        return missMessage;
-    }
+    let resultMessage = hitIndex(enemyGrid, index);
+    return resultMessage;
+    //enemyGrid[index].wasHit = true;
+    //let shipHere = enemyGrid[index].shipHere;
+    //if (shipHere != null)
+    //{
+    //    shipHere.health--;
+    //    let resultMessage = "Hit!";
+    //    if (shipHere.health === 0)
+    //    {
+    //        enemyShipsRemaining--;
+    //        resultMessage += ` You have sunk a ${shipHere.name}.`;
+    //    }
+    //    return resultMessage;
+    //}
+    //else
+    //{
+    //    return missMessage;
+    //}
 }
 //#endregion
 //#region Enemy Actions
 function enemyAttackPlayer()
 {
     debugLog("Enemy attack");
+    let index = chooseAttackIndex();
+    let resultMessage = hitIndex(playerGrid, index);
+    return resultMessage;
+}
+
+function hitIndex(targetGrid, index)
+{
+    debugLog("Hitting index " + index);
+    targetGrid[index].wasHit = true;
+    let shipHere = targetGrid[index].shipHere;
+    let isPlayerAttack = targetGrid === enemyGrid;
+    if (shipHere != null)
+    {
+        shipHere.health--;
+        let resultMessage = isPlayerAttack ? "Hit!" : `The enemy hit your ${shipHere.name}.`;
+        if (shipHere.health === 0)
+        {
+            if (isPlayerAttack) { enemyShipsRemaining--; }
+            else { playerShipsRemaining--; }
+            let messageExtra = isPlayerAttack ? ` You have sunk a ${shipHere.name}.` : " Sunk!";
+            resultMessage += messageExtra;
+        }
+        return resultMessage;
+    }
+    else
+    {
+        let attackedCoords = indexToCoords(index);
+        let [x, y] = attackedCoords;
+        let missMessage = isPlayerAttack ? "You have missed!" : `The enemy attacked ${coordsToCellName(x, y)} and missed.`;
+        return missMessage;
+    }
+}
+
+function chooseAttackIndex()
+{
+    let chosenIndex = enemyCheats ? getCheaterIndex() : getRandomCheckerboardIndex();
+    return chosenIndex;
+}
+
+function getCheaterIndex()
+{
+    let unhitIndexes = playerGrid.filter((cell) => cell.shipHere != null && !cell.wasHit);
+    return playerGrid.indexOf(unhitIndexes[0]);
+}
+
+function getRandomCheckerboardIndex()
+{
+    let randX;
+    let randY;
+    let index;
+    let safety = 0;
+    do
+    {
+        //pick random targets using the checkerboard strategy
+        randX = randomInt(0, 5) * 2;
+        randY = randomInt(0, 10);
+        if (randY % 2 != 0) { randX++; };
+        safety++;
+        index = coordsToIndex(randX, randY);
+        console.log("Checking " + randX + ", " + randY);
+    } while (playerGrid[index].wasHit && safety < 9999); //never choose an index we've already attacked
+    if (safety === 9999) { console.log("ERROR: Runaway loop!"); }
+    return coordsToIndex(randX, randY);
 }
 //#endregion
 //#region Drawing
@@ -240,6 +307,7 @@ function debugLog(message)
 //#region Execution
 readline.keyIn("Press any key to start the game.");
 let quit = false;
+let gameOverMessage = "";
 do
 {
     buildBothGrids(gridSize);
@@ -262,9 +330,15 @@ do
             drawGrid(enemyGrid);
             drawGrid(playerGrid);
             console.log(playerResultMessage);
+            console.log(enemyResultMessage);
         }
-        return enemyShipsRemaining === 0;
+        let playerWins = enemyShipsRemaining === 0;
+        let enemyWins = playerShipsRemaining === 0;
+        gameOverMessage = playerWins ? 
+        "You have destroyed all the enemy's battleships." : "The enemy has destroyed all your battleships.";
+        gameOverMessage += " Would you like to play again?";
+        return playerWins || enemyWins;
     });
-} while (!quit && readline.keyInYN("You have destroyed all battleships. Would you like to play again?"));
+} while (!quit && readline.keyInYN(gameOverMessage));
 console.log("Successfully quit");
 //#endregion
