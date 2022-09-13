@@ -1,0 +1,260 @@
+//#region Variables
+const readline = require("readline-sync");
+const letters = "abcdefghij";
+const numbers = ["1","2","3","4","5","6","7","8","9","10",]; //expanded to array because 10 has two characters
+const gridSize = 10;
+const playerGrid = [];
+const enemyGrid = [];
+const instruction = "Enter a location to strike ie \'A2\'";
+const missMessage = "You have missed!";
+const repeatMessage = "You have already picked this location. Miss!";
+const debugMessages = true;
+let playerShipsRemaining = 0;
+let enemyShipsRemaining = 0;
+//#endregion
+//#region Classes
+class Input
+{
+    constructor(input)
+    {
+        this.letter = input.charAt(0).toLowerCase();
+        this.number = input.slice(1);
+        this.isValid = letters.includes(this.letter) && 
+        numbers.includes(this.number);
+        if (!this.isValid)
+        {
+            console.log("Invalid input! " + instruction);
+            return;
+        }
+    }
+}
+class Cell
+{
+    constructor()
+    {
+        this.shipHere = null;
+        this.wasHit = false;
+    }
+}
+class Ship
+{
+    constructor(name, length, pointDown)
+    {
+        this.name = name;
+        this.length = length;
+        this.pointDown = pointDown;
+        this.health = length;
+    }
+}
+class Vector2
+{
+    constructor(x, y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+    add(vectorToAdd)
+    {
+        this.x += vectorToAdd.x;
+        this.y += vectorToAdd.y;
+    }
+}
+//#endregion
+//#region Functions
+const getRandomIndex = () => Math.floor(Math.random() * gridSize * gridSize);
+const coordsToIndex = (x, y) => y * gridSize + x;
+const indexToCoords = (index) => [index % gridSize, Math.floor(index / gridSize)];
+const coordsToCellName = (x, y) => `${letters.charAt(y)}${x + 1}`;
+const randomInt = (minInclusive, maxExclusive) => Math.floor(Math.random() * (maxExclusive - minInclusive)) + minInclusive;
+const drawHorzLine = () => console.log("   +" + "----+".repeat(gridSize));
+
+function placeAllShips()
+{
+    placeShip(new Ship("Destroyer", 2), playerGrid);
+    placeShip(new Ship("Submarine", 3), playerGrid);
+    placeShip(new Ship("Cruiser", 3), playerGrid);
+    placeShip(new Ship("Battleship", 4), playerGrid);
+    placeShip(new Ship("Carrier", 5), playerGrid);
+
+    placeShip(new Ship("Destroyer", 2), enemyGrid);
+    placeShip(new Ship("Submarine", 3), enemyGrid);
+    placeShip(new Ship("Cruiser", 3), enemyGrid);
+    placeShip(new Ship("Battleship", 4), enemyGrid);
+    placeShip(new Ship("Carrier", 5), enemyGrid);
+}
+
+function placeShip(ship, targetGrid)
+{
+    debugLog(`Preparing to place ${ship.name}`);
+    let safety = 0;
+    while (safety < 9999)
+    {
+        let randPos = new Vector2(randomInt(0, gridSize), randomInt(0, gridSize));
+        let pointDown = Math.random() > 0.5 ? true : false;
+        let cellRange = tryGetEmptyCellRange(randPos.x, randPos.y, ship.length, pointDown, targetGrid);
+        if (cellRange != null)
+        {
+            debugLog(`Placing ${ship.name} going ${pointDown ? "down" : "right"} from ${coordsToCellName(randPos.x, randPos.y)}`);
+            for (cell of cellRange)
+            {
+                cell.shipHere = ship;
+            }
+            enemyShipsRemaining++;
+            break;
+        }
+        debugLog("Placement failed.");
+        safety++;
+    }
+    if (safety === 9999) { debugLog("Runaway loop!"); }
+}
+
+function tryGetEmptyCellRange(startX, startY, length, goDown, targetGrid)
+{
+    let curPos = new Vector2(startX, startY);
+    let incrementor = goDown ? new Vector2(0, 1) : new Vector2(1, 0);
+    let cellRange = [];
+    for (let i = 0; i < length; i++)
+    {
+        let index = coordsToIndex(curPos.x, curPos.y);
+        if (!isInBounds(curPos))
+        {
+            debugLog("The cell range went out of bounds.");
+            return null;
+        }
+        if (targetGrid[index].shipHere != null) 
+        { 
+            debugLog(`The cell already has a ${targetGrid[index].shipHere.name}.`);
+            return null; 
+        }
+        cellRange.push(targetGrid[index]);
+        curPos.add(incrementor);
+    }
+    return cellRange;
+}
+
+function isInBounds(positionVector)
+{
+    return positionVector.x >= 0 && positionVector.x < gridSize &&
+    positionVector.y >= 0 && positionVector.y < gridSize;
+}
+
+function buildBothGrids(squareSize)
+{
+    let cellCount = squareSize * squareSize;
+    for (let i = 0; i < cellCount; i++)
+    {
+        playerGrid[i] = new Cell();
+        enemyGrid[i] = new Cell();
+    }
+}
+
+function attack(input)
+{
+    let xCoordinate = input.number - 1;
+    let yCoordinate = letters.indexOf(input.letter);
+    let index = xCoordinate + yCoordinate * gridSize;
+
+    if (enemyGrid[index].wasHit)
+    {
+        return repeatMessage;
+    }
+    enemyGrid[index].wasHit = true;
+    let shipHere = enemyGrid[index].shipHere;
+    if (shipHere != null)
+    {
+        shipHere.health--;
+        let resultMessage = "Hit!";
+        if (shipHere.health === 0)
+        {
+            enemyShipsRemaining--;
+            resultMessage += ` You have sunk a ${shipHere.name}.`;
+        }
+        return resultMessage;
+    }
+    else
+    {
+        return missMessage;
+    }
+}
+
+function drawGrid(gridToDraw)
+{
+    let spacer = "-".repeat(20);
+    let titleStr = gridToDraw === playerGrid ? `${spacer}YOUR SHIPS${spacer}` : `${spacer}ENEMY SHIPS${spacer}`;
+    console.log(titleStr);
+    drawTopNumbers();
+    drawHorzLine();
+    for (let i = 0; i < gridSize; i++)
+    {
+        drawCellRow(i, gridToDraw);
+        drawHorzLine();
+    }
+}
+
+function drawCellRow(yCoordinate, gridToDraw)
+{
+    let str = `${letters.charAt(yCoordinate)}  |`;
+    for (let xCoordinate = 0; xCoordinate < gridSize; xCoordinate++)
+    {
+        let index = coordsToIndex(xCoordinate, yCoordinate);
+        let cellGraphic = "  ";
+        let isPlayerGrid = gridToDraw === playerGrid;
+        let shouldDrawShips = isPlayerGrid || (debugMessages && !isPlayerGrid);
+        if (shouldDrawShips && gridToDraw[index].shipHere != null) 
+        { 
+            cellGraphic = gridToDraw[index].shipHere.name.slice(0, 2); 
+        }
+        if (gridToDraw[index].wasHit)
+        {
+            cellGraphic = gridToDraw[index].shipHere != null ? "XX" : "OO";
+        }
+        str += ` ${cellGraphic} |`;
+    }
+    console.log(str);
+}
+
+function drawTopNumbers()
+{
+    let str = " ".repeat(3);
+    for (let i = 0; i < 10; i++)
+    {
+        str += `  ${i + 1}  `;
+    }
+    console.log(str);
+}
+
+function debugLog(message)
+{
+    if (debugMessages) { console.log(message); }
+}
+//#endregion
+//#region Execution
+readline.keyIn("Press any key to start the game.");
+let quit = false;
+do
+{
+    buildBothGrids(gridSize);
+    placeAllShips();
+    drawGrid(enemyGrid);
+    drawGrid(playerGrid);
+    console.log(instruction);
+    readline.promptLoop((inputStr) =>
+    {
+        if (inputStr.toLowerCase() === "quit") 
+        { 
+            quit = true;
+            return true; 
+        }
+        let input = new Input(inputStr);
+        if (input.isValid) 
+        { 
+            let resultMessage = attack(input); 
+            drawGrid(enemyGrid);
+            drawGrid(playerGrid);
+            console.log(resultMessage);
+        }
+        return enemyShipsRemaining === 0;
+    });
+} while (!quit && readline.keyInYN("You have destroyed all battleships. Would you like to play again?"));
+console.log("Successfully quit");
+//#endregion
