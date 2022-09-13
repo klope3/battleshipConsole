@@ -67,7 +67,7 @@ const indexToCoords = (index) => [index % gridSize, Math.floor(index / gridSize)
 const coordsToCellName = (x, y) => `${letters.charAt(y)}${x + 1}`;
 const randomInt = (minInclusive, maxExclusive) => Math.floor(Math.random() * (maxExclusive - minInclusive)) + minInclusive;
 const drawHorzLine = () => console.log("   +" + "----+".repeat(gridSize));
-
+//#region Setup
 function placeAllShips()
 {
     placeShip(new Ship("Destroyer", 2), playerGrid);
@@ -108,30 +108,6 @@ function placeShip(ship, targetGrid)
     if (safety === 9999) { debugLog("Runaway loop!"); }
 }
 
-function tryGetEmptyCellRange(startX, startY, length, goDown, targetGrid)
-{
-    let curPos = new Vector2(startX, startY);
-    let incrementor = goDown ? new Vector2(0, 1) : new Vector2(1, 0);
-    let cellRange = [];
-    for (let i = 0; i < length; i++)
-    {
-        let index = coordsToIndex(curPos.x, curPos.y);
-        if (!isInBounds(curPos))
-        {
-            debugLog("The cell range went out of bounds.");
-            return null;
-        }
-        if (targetGrid[index].shipHere != null) 
-        { 
-            debugLog(`The cell already has a ${targetGrid[index].shipHere.name}.`);
-            return null; 
-        }
-        cellRange.push(targetGrid[index]);
-        curPos.add(incrementor);
-    }
-    return cellRange;
-}
-
 function isInBounds(positionVector)
 {
     return positionVector.x >= 0 && positionVector.x < gridSize &&
@@ -147,8 +123,9 @@ function buildBothGrids(squareSize)
         enemyGrid[i] = new Cell();
     }
 }
-
-function attack(input)
+//#endregion
+//#region Player Actions
+function playerAttackEnemy(input)
 {
     let xCoordinate = input.number - 1;
     let yCoordinate = letters.indexOf(input.letter);
@@ -176,7 +153,14 @@ function attack(input)
         return missMessage;
     }
 }
-
+//#endregion
+//#region Enemy Actions
+function enemyAttackPlayer()
+{
+    debugLog("Enemy attack");
+}
+//#endregion
+//#region Drawing
 function drawGrid(gridToDraw)
 {
     let spacer = "-".repeat(20);
@@ -222,7 +206,32 @@ function drawTopNumbers()
     }
     console.log(str);
 }
-
+//#endregion
+//#region Misc
+function tryGetEmptyCellRange(startX, startY, length, goDown, targetGrid)
+{
+    let curPos = new Vector2(startX, startY);
+    let incrementor = goDown ? new Vector2(0, 1) : new Vector2(1, 0);
+    let cellRange = [];
+    for (let i = 0; i < length; i++)
+    {
+        let index = coordsToIndex(curPos.x, curPos.y);
+        if (!isInBounds(curPos))
+        {
+            debugLog("The cell range went out of bounds.");
+            return null;
+        }
+        if (targetGrid[index].shipHere != null) 
+        { 
+            debugLog(`The cell already has a ${targetGrid[index].shipHere.name}.`);
+            return null; 
+        }
+        cellRange.push(targetGrid[index]);
+        curPos.add(incrementor);
+    }
+    return cellRange;
+}
+//#endregion
 function debugLog(message)
 {
     if (debugMessages) { console.log(message); }
@@ -248,10 +257,11 @@ do
         let input = new Input(inputStr);
         if (input.isValid) 
         { 
-            let resultMessage = attack(input); 
+            let playerResultMessage = playerAttackEnemy(input); 
+            let enemyResultMessage = enemyAttackPlayer();
             drawGrid(enemyGrid);
             drawGrid(playerGrid);
-            console.log(resultMessage);
+            console.log(playerResultMessage);
         }
         return enemyShipsRemaining === 0;
     });
