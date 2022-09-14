@@ -11,6 +11,7 @@ const debugMessages = false;
 const enemyCheats = false; //make the enemy hit one of our ships every time, for debugging only
 let playerShipsRemaining = 0;
 let enemyShipsRemaining = 0;
+let useCheckerboardStrat = true; //stop using the strategy when we've run out of checkerboard-pattern spaces to hit
 //#endregion
 //#region Classes
 class Input
@@ -46,7 +47,7 @@ class Ship
         this.health = length;
     }
 }
-class Vector2
+class Vector2 //used to express positions and directions
 {
     constructor(x, y)
     {
@@ -68,19 +69,13 @@ const coordsToCellName = (x, y) => `${letters.charAt(y)}${x + 1}`;
 const randomInt = (minInclusive, maxExclusive) => Math.floor(Math.random() * (maxExclusive - minInclusive)) + minInclusive;
 const drawHorzLine = () => console.log("   +" + "----+".repeat(gridSize));
 //#region Setup
-function placeAllShips()
+function placeFleet(targetGrid)
 {
-    placeShip(new Ship("Destroyer", 2), playerGrid);
-    placeShip(new Ship("Submarine", 3), playerGrid);
-    placeShip(new Ship("Cruiser", 3), playerGrid);
-    placeShip(new Ship("Battleship", 4), playerGrid);
-    placeShip(new Ship("Carrier", 5), playerGrid);
-
-    placeShip(new Ship("Destroyer", 2), enemyGrid);
-    placeShip(new Ship("Submarine", 3), enemyGrid);
-    placeShip(new Ship("Cruiser", 3), enemyGrid);
-    placeShip(new Ship("Battleship", 4), enemyGrid);
-    placeShip(new Ship("Carrier", 5), enemyGrid);
+    placeShip(new Ship("Destroyer", 2), targetGrid);
+    placeShip(new Ship("Submarine", 3), targetGrid);
+    placeShip(new Ship("Cruiser", 3), targetGrid);
+    placeShip(new Ship("Battleship", 4), targetGrid);
+    placeShip(new Ship("Carrier", 5), targetGrid);
 }
 
 function placeShip(ship, targetGrid)
@@ -107,7 +102,7 @@ function placeShip(ship, targetGrid)
         debugLog("Placement failed.");
         safety++;
     }
-    if (safety === 9999) { debugLog("Runaway loop!"); }
+    if (safety === 9999) { debugLog("ERROR: Runaway loop!"); }
 }
 
 function isInBounds(positionVector)
@@ -126,47 +121,7 @@ function buildBothGrids(squareSize)
     }
 }
 //#endregion
-//#region Player Actions
-function playerAttackEnemy(input)
-{
-    let xCoordinate = input.number - 1;
-    let yCoordinate = letters.indexOf(input.letter);
-    let index = xCoordinate + yCoordinate * gridSize;
-
-    if (enemyGrid[index].wasHit)
-    {
-        return repeatMessage;
-    }
-    let resultMessage = hitIndex(enemyGrid, index);
-    return resultMessage;
-    //enemyGrid[index].wasHit = true;
-    //let shipHere = enemyGrid[index].shipHere;
-    //if (shipHere != null)
-    //{
-    //    shipHere.health--;
-    //    let resultMessage = "Hit!";
-    //    if (shipHere.health === 0)
-    //    {
-    //        enemyShipsRemaining--;
-    //        resultMessage += ` You have sunk a ${shipHere.name}.`;
-    //    }
-    //    return resultMessage;
-    //}
-    //else
-    //{
-    //    return missMessage;
-    //}
-}
-//#endregion
-//#region Enemy Actions
-function enemyAttackPlayer()
-{
-    debugLog("Enemy attack");
-    let index = chooseAttackIndex();
-    let resultMessage = hitIndex(playerGrid, index);
-    return resultMessage;
-}
-
+//#region General Actions
 function hitIndex(targetGrid, index)
 {
     debugLog("Hitting index " + index);
@@ -194,20 +149,45 @@ function hitIndex(targetGrid, index)
         return missMessage;
     }
 }
+//#endregion
+//#region Player Actions
+function playerAttackEnemy(input)
+{
+    let xCoordinate = input.number - 1;
+    let yCoordinate = letters.indexOf(input.letter);
+    let index = xCoordinate + yCoordinate * gridSize;
+
+    if (enemyGrid[index].wasHit)
+    {
+        return repeatMessage;
+    }
+    let resultMessage = hitIndex(enemyGrid, index);
+    return resultMessage;
+}
+//#endregion
+//#region Enemy Actions
+function enemyAttackPlayer()
+{
+    debugLog("Enemy attack");
+    let index = chooseAttackIndex();
+    let resultMessage = hitIndex(playerGrid, index);
+    return resultMessage;
+}
 
 function chooseAttackIndex()
 {
-    let chosenIndex = enemyCheats ? getCheaterIndex() : getRandomCheckerboardIndex();
+    //this is where more sophisticated AI would go, but this is currently out-of-scope
+    let chosenIndex = enemyCheats ? getCheaterIndex() : getRandomUnhitIndex();
     return chosenIndex;
 }
 
 function getCheaterIndex()
 {
     let unhitIndexes = playerGrid.filter((cell) => cell.shipHere != null && !cell.wasHit);
-    return playerGrid.indexOf(unhitIndexes[0]);
+    return playerGrid.indexOf(unhitIndexes[0]); //will always be a spot with a player ship
 }
 
-function getRandomCheckerboardIndex()
+function getRandomUnhitIndex()
 {
     let randX;
     let randY;
@@ -215,15 +195,20 @@ function getRandomCheckerboardIndex()
     let safety = 0;
     do
     {
-        //pick random targets using the checkerboard strategy
-        randX = randomInt(0, 5) * 2;
+        randX = useCheckerboardStrat? randomInt(0, 5) * 2 : randomInt(0, 10);
         randY = randomInt(0, 10);
-        if (randY % 2 != 0) { randX++; };
+        if (useCheckerboardStrat && randY % 2 != 0) { randX++; };
         safety++;
         index = coordsToIndex(randX, randY);
-        console.log("Checking " + randX + ", " + randY);
+        debugLog("Checking " + randX + ", " + randY);
+
+        if (safety === 100) 
+        { 
+            debugLog("Giving up on checkerboard strategy");
+            useCheckerboardStrat = false; 
+        }
     } while (playerGrid[index].wasHit && safety < 9999); //never choose an index we've already attacked
-    if (safety === 9999) { console.log("ERROR: Runaway loop!"); }
+    if (safety === 9999) { debugLog("ERROR: Runaway loop!"); }
     return coordsToIndex(randX, randY);
 }
 //#endregion
@@ -231,7 +216,7 @@ function getRandomCheckerboardIndex()
 function drawGrid(gridToDraw)
 {
     let spacer = "-".repeat(20);
-    let titleStr = gridToDraw === playerGrid ? `${spacer}YOUR SHIPS${spacer}` : `${spacer}ENEMY SHIPS${spacer}`;
+    let titleStr = gridToDraw === playerGrid ? `${spacer}YOUR SHIPS${spacer}` : `${spacer}ENEMY WATERS${spacer}`;
     console.log(titleStr);
     drawTopNumbers();
     drawHorzLine();
@@ -311,9 +296,10 @@ let gameOverMessage = "";
 do
 {
     buildBothGrids(gridSize);
-    placeAllShips();
+    placeFleet(playerGrid);
+    placeFleet(enemyGrid);
     drawGrid(enemyGrid);
-    drawGrid(playerGrid);
+    //drawGrid(playerGrid);
     console.log(instruction);
     readline.promptLoop((inputStr) =>
     {
@@ -328,7 +314,7 @@ do
             let playerResultMessage = playerAttackEnemy(input); 
             let enemyResultMessage = enemyAttackPlayer();
             drawGrid(enemyGrid);
-            drawGrid(playerGrid);
+            //drawGrid(playerGrid);
             console.log(playerResultMessage);
             console.log(enemyResultMessage);
         }
